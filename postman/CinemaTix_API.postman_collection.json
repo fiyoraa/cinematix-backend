@@ -1,0 +1,1370 @@
+{
+  "info": {
+    "_postman_id": "a7c2e911-8f30-42c1-b811-cinematixcol05",
+    "name": "CinemaTix API - Automated Test Suite (Kelompok 5 SI5B)",
+    "description": "Koleksi pengujian otomatis RESTful API CinemaTix mencakup Autentikasi & RBAC, CRUD & Request Chaining, Skenario Gagal (400/401/403/404/409), dan Keamanan NoSQL Injection.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "A. Autentikasi & RBAC",
+      "item": [
+        {
+          "name": "01. GET Health Check Root",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Respons JSON menampilkan status API aktif', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData).to.have.property('status', 'active');",
+                  "  pm.expect(jsonData).to.have.property('service');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            }
+          }
+        },
+        {
+          "name": "02. POST Register User Baru (Abaikan Role Admin)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const unik = Date.now();",
+                  "pm.environment.set('test_username', 'penonton_' + unik);",
+                  "pm.environment.set('test_email', 'penonton_' + unik + '@cinematix.id');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 201 Created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Role tetap user meskipun body mengirim role admin & password tidak bocor', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData).to.have.property('username', pm.environment.get('test_username'));",
+                  "  pm.expect(jsonData).to.have.property('role', 'user');",
+                  "  pm.expect(jsonData).to.not.have.property('password');",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.environment.set('registered_user_id', jsonData._id || jsonData.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{test_username}}\",\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\",\n  \"role\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "03. POST Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Respons memuat JWT token dan profil user tanpa password', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData).to.have.property('token').that.is.a('string');",
+                  "  pm.expect(jsonData.user).to.have.property('role', 'user');",
+                  "  pm.expect(jsonData.user).to.not.have.property('password');",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.environment.set('token_user', pm.response.json().token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{test_username}}\",\n  \"password\": \"{{test_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "04. POST Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Respons memuat token dengan role admin', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData).to.have.property('token').that.is.a('string');",
+                  "  pm.expect(jsonData.user).to.have.property('role', 'admin');",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.environment.set('token_admin', pm.response.json().token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{admin_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "05. GET Profil Pengguna Aktif (/api/auth/me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Profil sesuai user yang login dan tanpa password', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData.username).to.eql(pm.environment.get('test_username'));",
+                  "  pm.expect(jsonData).to.not.have.property('password');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_user}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "06. GET Daftar Seluruh Pengguna (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Format pagination lengkap dan password tersembunyi', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData).to.have.all.keys('data', 'page', 'limit', 'total', 'totalPages');",
+                  "  pm.expect(jsonData.data).to.be.an('array').that.is.not.empty;",
+                  "  pm.expect(jsonData.data[0]).to.not.have.property('password');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/users?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "07. PATCH Ubah Peran Pengguna Menjadi Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Peran pengguna berubah menjadi admin', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData.role).to.eql('admin');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/users/{{registered_user_id}}/role",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "{{registered_user_id}}", "role"]
+            }
+          }
+        },
+        {
+          "name": "08. PATCH Kembalikan Peran Pengguna ke User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Peran pengguna kembali menjadi user', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData.role).to.eql('user');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/users/{{registered_user_id}}/role",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "{{registered_user_id}}", "role"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "B. CRUD & Request Chaining",
+      "item": [
+        {
+          "name": "09. POST Tambah Film Baru (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 201 Created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Film tersimpan lengkap beserta embedded detailProduksi', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData).to.have.property('_id');",
+                  "  pm.expect(jsonData.judul).to.eql('Interstellar: IMAX Re-Issue');",
+                  "  pm.expect(jsonData.detailProduksi).to.have.property('sutradara', 'Christopher Nolan');",
+                  "  pm.expect(jsonData.detailProduksi).to.not.have.property('_id');",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('movie_id', pm.response.json()._id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"judul\": \"Interstellar: IMAX Re-Issue\",\n  \"sinopsis\": \"Tim penjelajah antariksa melewati lubang cacing demi mencari planet baru bagi kelangsungan umat manusia.\",\n  \"genre\": \"Sci-Fi\",\n  \"durasi\": 169,\n  \"ratingUsia\": \"13+\",\n  \"posterUrl\": \"https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800\",\n  \"status\": \"now_showing\",\n  \"detailProduksi\": {\n    \"sutradara\": \"Christopher Nolan\",\n    \"bahasa\": \"Inggris\",\n    \"tahunRilis\": 2014\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/movies",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies"]
+            }
+          }
+        },
+        {
+          "name": "10. GET Daftar Film (Filter, Sort, Pagination, Projection)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Kontrak pagination { data, page, limit, total, totalPages } dan projection sesuai', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData).to.have.all.keys('data', 'page', 'limit', 'total', 'totalPages');",
+                  "  pm.expect(jsonData.data).to.be.an('array').that.is.not.empty;",
+                  "  jsonData.data.forEach((m) => {",
+                  "    pm.expect(m.genre).to.eql('Sci-Fi');",
+                  "    pm.expect(m).to.not.have.property('sinopsis');",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/movies?genre=Sci-Fi&status=now_showing&sort=-createdAt&page=1&limit=5&fields=judul,genre,durasi,ratingUsia",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies"],
+              "query": [
+                { "key": "genre", "value": "Sci-Fi" },
+                { "key": "status", "value": "now_showing" },
+                { "key": "sort", "value": "-createdAt" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "5" },
+                { "key": "fields", "value": "judul,genre,durasi,ratingUsia" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "11. GET Detail Satu Film",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('ID film sesuai movie_id hasil chaining', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData._id).to.eql(pm.environment.get('movie_id'));",
+                  "  pm.expect(jsonData.judul).to.eql('Interstellar: IMAX Re-Issue');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/movies/{{movie_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies", "{{movie_id}}"]
+            }
+          }
+        },
+        {
+          "name": "12. PUT Perbarui Film (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Durasi berubah menjadi 170 dan judul tetap terjaga', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData.durasi).to.eql(170);",
+                  "  pm.expect(jsonData.judul).to.eql('Interstellar: IMAX Re-Issue');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"durasi\": 170\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/movies/{{movie_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies", "{{movie_id}}"]
+            }
+          }
+        },
+        {
+          "name": "13. POST Tambah Jadwal Tayang (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 201 Created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Jadwal tersimpan dengan studio embedded & movieId ter-populate', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData).to.have.property('_id');",
+                  "  pm.expect(jsonData.studio).to.have.property('nama', 'Studio 3 IMAX');",
+                  "  pm.expect(jsonData.movieId).to.be.an('object');",
+                  "  pm.expect(jsonData.movieId._id).to.eql(pm.environment.get('movie_id'));",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('showtime_id', pm.response.json()._id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"movieId\": \"{{movie_id}}\",\n  \"waktuTayang\": \"2026-12-10T12:30:00.000Z\",\n  \"harga\": 50000,\n  \"studio\": {\n    \"nama\": \"Studio 3 IMAX\",\n    \"tipe\": \"IMAX\",\n    \"kapasitas\": 48\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/showtimes",
+              "host": ["{{base_url}}"],
+              "path": ["api", "showtimes"]
+            }
+          }
+        },
+        {
+          "name": "14. GET Daftar Jadwal Tayang (Filter Tidak Langsung Genre & Populate)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Hasil filter genre tidak langsung ter-populate dengan benar', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData).to.have.all.keys('data', 'page', 'limit', 'total', 'totalPages');",
+                  "  pm.expect(jsonData.data).to.be.an('array').that.is.not.empty;",
+                  "  pm.expect(jsonData.data[0].movieId).to.have.property('genre', 'Sci-Fi');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/showtimes?genre=Sci-Fi&sort=waktuTayang&page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "showtimes"],
+              "query": [
+                { "key": "genre", "value": "Sci-Fi" },
+                { "key": "sort", "value": "waktuTayang" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "15. GET Detail Satu Jadwal Tayang",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Memiliki bookedSeats berupa array', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData._id).to.eql(pm.environment.get('showtime_id'));",
+                  "  pm.expect(jsonData.bookedSeats).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/showtimes/{{showtime_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "showtimes", "{{showtime_id}}"]
+            }
+          }
+        },
+        {
+          "name": "16. PUT Perbarui Harga Jadwal Tayang (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Harga tiket diperbarui menjadi 55000', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData.harga).to.eql(55000);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"harga\": 55000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/showtimes/{{showtime_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "showtimes", "{{showtime_id}}"]
+            }
+          }
+        },
+        {
+          "name": "17. POST Buat Pesanan Tiket & Normalisasi Kursi (User)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 201 Created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Kursi dinormalkan ke huruf kapital, totalPrice dihitung server, dan kode booking unik dibuat', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData.seats).to.eql(['C4', 'C5']);",
+                  "  pm.expect(jsonData.totalPrice).to.eql(110000);",
+                  "  pm.expect(jsonData.bookingCode).to.include('CTX-');",
+                  "  pm.expect(jsonData.pembayaran).to.have.property('status', 'Lunas');",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('booking_id', pm.response.json()._id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_user}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showtimeId\": \"{{showtime_id}}\",\n  \"seats\": [\" c4 \", \"c5\", \"C4\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/bookings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "18. GET Riwayat Pesanan Saya (User)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Daftar pesanan ter-populate dengan showtimeId & movieId', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData).to.have.all.keys('data', 'page', 'limit', 'total', 'totalPages');",
+                  "  pm.expect(jsonData.data).to.be.an('array').that.is.not.empty;",
+                  "  pm.expect(jsonData.data[0].showtimeId).to.have.property('movieId');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_user}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/bookings?sort=-createdAt&page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings"],
+              "query": [
+                { "key": "sort", "value": "-createdAt" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "19. GET Detail E-Ticket (Pemilik)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Detail tiket sesuai booking_id', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData._id).to.eql(pm.environment.get('booking_id'));",
+                  "  pm.expect(jsonData.status).to.eql('confirmed');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_user}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/bookings/{{booking_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings", "{{booking_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "C. Skenario Gagal (Negative Test)",
+      "item": [
+        {
+          "name": "20. POST Bentrok Kursi / Double Booking Case-Insensitive (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 409 Conflict', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test('Pesan menyatakan kursi sudah terisi', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData.message).to.include('C4');",
+                  "  pm.expect(jsonData.message).to.include('sudah terisi');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_user}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showtimeId\": \"{{showtime_id}}\",\n  \"seats\": [\"c4\", \"D1\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/bookings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "21. POST Registrasi Email Duplikat (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 409 Conflict', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test('Pesan duplikat sesuai kontrak error handler', function () {",
+                  "  pm.expect(pm.response.json().message).to.eql('Data sudah terdaftar (duplikat)');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"user_lain_{{test_username}}\",\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "22. GET Format ID Bukan ObjectId / CastError (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 400 Bad Request', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Pesan error: Format ID tidak valid', function () {",
+                  "  pm.expect(pm.response.json().message).to.eql('Format ID tidak valid');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/movies/id-bukan-objectid",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies", "id-bukan-objectid"]
+            }
+          }
+        },
+        {
+          "name": "23. POST Format JSON Rusak (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 400 Bad Request', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Respons JSON rapi: Format JSON tidak valid', function () {",
+                  "  pm.response.to.be.json;",
+                  "  pm.expect(pm.response.json().message).to.eql('Format JSON tidak valid');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"judul\": \"Film JSON Rusak\",}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/movies",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies"]
+            }
+          }
+        },
+        {
+          "name": "24. POST Field Wajib Kosong / ValidationError (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 400 Bad Request', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Memuat message Data tidak valid dan array detail', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData.message).to.eql('Data tidak valid');",
+                  "  pm.expect(jsonData.detail).to.be.an('array').that.is.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"judul\": \"Film Tanpa Field Lengkap\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/movies",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies"]
+            }
+          }
+        },
+        {
+          "name": "25. GET Parameter Sort Di Luar Whitelist (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 400 Bad Request', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Menolak field sort ilegal', function () {",
+                  "  pm.expect(pm.response.json().message).to.include('tidak diizinkan');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/movies?sort=password",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies"],
+              "query": [
+                { "key": "sort", "value": "password" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "26. GET Parameter Fields Di Luar Whitelist (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 400 Bad Request', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Menolak field projection ilegal', function () {",
+                  "  pm.expect(pm.response.json().message).to.include('tidak diizinkan');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/showtimes?fields=rahasiaServer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "showtimes"],
+              "query": [
+                { "key": "fields", "value": "rahasiaServer" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "27. GET ID Film Tidak Ditemukan (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 404 Not Found', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('Pesan error: Film tidak ditemukan', function () {",
+                  "  pm.expect(pm.response.json().message).to.eql('Film tidak ditemukan');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/movies/65f000000000000000000099",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies", "65f000000000000000000099"]
+            }
+          }
+        },
+        {
+          "name": "28. GET Endpoint Tidak Ditemukan (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 404 Not Found', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('Pesan error: Endpoint tidak ditemukan', function () {",
+                  "  pm.expect(pm.response.json().message).to.eql('Endpoint tidak ditemukan');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/endpoint-tidak-terdaftar",
+              "host": ["{{base_url}}"],
+              "path": ["api", "endpoint-tidak-terdaftar"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "D. Pengujian Keamanan & Pembersihan Data Uji",
+      "item": [
+        {
+          "name": "29. GET Akses Tanpa Token JWT (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 401 Unauthorized', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Memuat properti message error', function () {",
+                  "  pm.expect(pm.response.json()).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/bookings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "30. GET Token JWT Dimodifikasi / Rusak (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 401 Unauthorized', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Pesan error: Token tidak valid', function () {",
+                  "  pm.expect(pm.response.json().message).to.eql('Token tidak valid');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.palsu.rusak" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "31. GET User Biasa Mencoba Akses /api/users (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 403 Forbidden', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test('Pesan error: Akses ditolak', function () {",
+                  "  pm.expect(pm.response.json().message).to.eql('Akses ditolak');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_user}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/users",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users"]
+            }
+          }
+        },
+        {
+          "name": "32. DELETE User Biasa Mencoba Hapus Film (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 403 Forbidden', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test('Pesan error: Akses ditolak', function () {",
+                  "  pm.expect(pm.response.json().message).to.eql('Akses ditolak');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_user}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/movies/{{movie_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies", "{{movie_id}}"]
+            }
+          }
+        },
+        {
+          "name": "33. POST Login NoSQL Injection Operator $ne (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 400 Bad Request', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Serangan NoSQL injection ditolak oleh validasi tipe string', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData).to.not.have.property('token');",
+                  "  pm.expect(jsonData.message).to.include('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": { \"$ne\": null },\n  \"password\": { \"$ne\": null }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "34. GET Filter Query NoSQL Injection ?genre[$ne]=Action (Aman)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK tanpa eksekusi operator $ne', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Mengembalikan data kosong [] karena dibungkus String()', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData.data).to.be.an('array').that.is.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/movies?genre[$ne]=Action",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies"],
+              "query": [
+                { "key": "genre[$ne]", "value": "Action" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "35. PATCH Batalkan Pesanan & Lepaskan Kursi (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Status pesanan berubah menjadi cancelled', function () {",
+                  "  const jsonData = pm.response.json();",
+                  "  pm.expect(jsonData.status).to.eql('cancelled');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_user}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"cancelled\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/bookings/{{booking_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings", "{{booking_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "36. DELETE Hapus Pesanan Uji (Admin - 204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 204 No Content', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});",
+                  "pm.test('Body respons kosong', function () {",
+                  "  pm.expect(pm.response.text()).to.eql('');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/bookings/{{booking_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings", "{{booking_id}}"]
+            }
+          }
+        },
+        {
+          "name": "37. DELETE Hapus Jadwal Uji (Admin - 204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 204 No Content', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});",
+                  "pm.test('Body respons kosong', function () {",
+                  "  pm.expect(pm.response.text()).to.eql('');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/showtimes/{{showtime_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "showtimes", "{{showtime_id}}"]
+            }
+          }
+        },
+        {
+          "name": "38. DELETE Hapus Film Uji (Admin - 204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 204 No Content', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});",
+                  "pm.test('Body respons kosong', function () {",
+                  "  pm.expect(pm.response.text()).to.eql('');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_admin}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/movies/{{movie_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies", "{{movie_id}}"]
+            }
+          }
+        },
+        {
+          "name": "39. GET Verifikasi Film Uji Sudah Dihapus (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code adalah 404 Not Found', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('Pesan menyatakan Film tidak ditemukan', function () {",
+                  "  pm.expect(pm.response.json().message).to.eql('Film tidak ditemukan');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/movies/{{movie_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "movies", "{{movie_id}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

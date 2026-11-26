@@ -1,0 +1,24 @@
+{
+  "name": "cinematix-backend",
+  "version": "1.0.0",
+  "description": "Backend RESTful API CinemaTix — Sistem Pemesanan Tiket Bioskop dan Pemilihan Kursi secara Daring (Kelompok 5, SI5B, Universitas MDP)",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "buat-admin": "node scripts/buatAdmin.js",
+    "seed": "node scripts/seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^9.0.0",
+    "morgan": "^1.10.0"
+  }
+}
